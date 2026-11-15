@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -58,7 +59,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -155,7 +158,7 @@ fun ChatInput(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    val containerShape = MaterialTheme.shapes.largeIncreased
+    val containerShape = RoundedCornerShape(28.dp)
     val modelListState = rememberModelListState(
         modelId = assistant.chatModelId ?: settings.chatModelId,
         providers = settings.providers,
@@ -399,14 +402,14 @@ private fun SendButton(
         else -> MaterialTheme.colorScheme.primary
     }
     val contentColor = when {
-        showStop -> MaterialTheme.colorScheme.onErrorContainer
+        showStop -> Color.White
         empty -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        else -> MaterialTheme.colorScheme.onPrimary
+        else -> Color.White
     }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(30.dp)
+            .size(36.dp)
             .testTag("chat_send_button")
             .clip(CircleShape)
             .combinedClickable(
@@ -415,11 +418,17 @@ private fun SendButton(
                 onLongClick = onLongClick,
             )
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            shape = CircleShape,
-            color = containerColor,
-            content = {},
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = if (showStop || !empty) {
+                        Brush.linearGradient(listOf(Color(0xFF4F8DFF), Color(0xFFA855F7)))
+                    } else {
+                        SolidColor(containerColor)
+                    },
+                    shape = CircleShape,
+                )
         )
         Icon(
             imageVector = if (showStop) HugeIcons.Cancel01 else HugeIcons.ArrowUp02,

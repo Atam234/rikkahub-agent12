@@ -34,6 +34,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import me.rerere.hugeicons.stroke.Settings03
+import me.rerere.hugeicons.stroke.Add01
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -321,6 +334,9 @@ private fun ChatPageContent(
                     previewMode = previewMode,
                     onNewChat = {
                         navigateToChatPage(navController)
+                    },
+                    onOpenSettings = {
+                        navController.navigate(Screen.Setting)
                     },
                     onClickMenu = {
                         previewMode = !previewMode
@@ -629,6 +645,7 @@ private fun TopBar(
     previewMode: Boolean,
     onClickMenu: () -> Unit,
     onNewChat: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
@@ -640,10 +657,11 @@ private fun TopBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
         navigationIcon = {
             if (!bigScreen) {
-                IconButton(
+                GlossyCircleButton(
                     onClick = {
                         scope.launch { drawerState.open() }
-                    }
+                    },
+                    modifier = Modifier.padding(start = 8.dp, end = 4.dp),
                 ) {
                     Icon(HugeIcons.Menu03, stringResource(R.string.menu))
                 }
@@ -666,9 +684,9 @@ private fun TopBar(
                     val model = settings.getCurrentChatModel()
                     val provider = model?.findProvider(providers = settings.providers, checkOverwrite = false)
                     Text(
-                        text = conversation.title.ifBlank { stringResource(R.string.chat_page_new_chat) },
+                        text = conversation.title.ifBlank { stringResource(R.string.app_name) },
                         maxLines = 1,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (model != null && provider != null) {
@@ -678,7 +696,7 @@ private fun TopBar(
                             maxLines = 1,
                             color = LocalContentColor.current.copy(0.65f),
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 8.sp,
+                                fontSize = 11.sp,
                             )
                         )
                     }
@@ -686,21 +704,47 @@ private fun TopBar(
             }
         },
         actions = {
-            IconButton(
-                onClick = {
-                    onClickMenu()
-                }
-            ) {
+            GlossyCircleButton(onClick = onClickMenu) {
                 Icon(if (previewMode) HugeIcons.Cancel01 else HugeIcons.LeftToRightListBullet, stringResource(R.string.accessibility_chat_options))
             }
 
-            IconButton(
-                onClick = {
-                    onNewChat()
-                }
+            GlossyCircleButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.padding(start = 8.dp),
             ) {
-                Icon(HugeIcons.MessageAdd01, stringResource(R.string.chat_page_new_message))
+                Icon(HugeIcons.Settings03, stringResource(R.string.settings))
+            }
+
+            GlossyCircleButton(
+                onClick = onNewChat,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            ) {
+                Icon(HugeIcons.Add01, stringResource(R.string.chat_page_new_message))
             }
         },
     )
+}
+
+@Composable
+private fun GlossyCircleButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(colors.surfaceContainerHighest, colors.surfaceContainerLow)
+                )
+            )
+            .border(1.dp, colors.onSurface.copy(alpha = 0.14f), CircleShape)
+            .clickable(onClick = onClick),
+    ) {
+        content()
+    }
 }
