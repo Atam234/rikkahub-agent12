@@ -1746,6 +1746,10 @@
   <string name="local_llm_catalog_tag_tools">Tools</string>
   <string name="local_llm_llamacpp_catalog_title">Available models</string>
   <string name="local_llm_llamacpp_catalog_subtitle">Curated GGUF models with a tool-calling chat template. Pick one for one-tap install.</string>
+  <string name="local_model_import_action">Import local AI model from files</string>
+  <string name="local_model_import_hint">Pick a .gguf (llama.cpp) or .litertlm (LiteRT) file from your storage. It is copied into the app and runs fully on-device.</string>
+  <string name="local_model_import_copying">Copying model into the app…</string>
+  <string name="local_model_import_unsupported">Unsupported file. Pick a model file ending in .gguf or .litertlm.</string>
   <string name="local_llm_llamacpp_import_action">Install a GGUF you already have</string>
   <string name="local_llm_hf_search_title">Search HuggingFace</string>
   <string name="local_llm_hf_search_placeholder">Model name, e.g. Qwen3</string>

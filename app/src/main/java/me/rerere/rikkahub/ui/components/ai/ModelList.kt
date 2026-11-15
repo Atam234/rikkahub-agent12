@@ -489,6 +489,12 @@ private fun ColumnScope.ModelList(
             }
         }
 
+        if (modelType == ModelType.CHAT) {
+            item(key = "local-model-import") {
+                LocalModelImportButton()
+            }
+        }
+
         if (favoriteModels.isNotEmpty()) {
             stickyHeader {
                 Text(

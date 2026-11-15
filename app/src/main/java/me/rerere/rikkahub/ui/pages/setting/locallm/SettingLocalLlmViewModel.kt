@@ -30,6 +30,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.api.HuggingFaceAPI
 import me.rerere.rikkahub.data.api.HuggingFaceModelSearch
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.model.HfModelSearchResult
 import okhttp3.OkHttpClient
 
@@ -510,6 +511,7 @@ class SettingLocalLlmViewModel(
                     updateMyProvider { provider -> registerInstalledModel(provider, model) }
                     // Enable the provider automatically after the first successful install.
                     updateMyProvider(::enableAfterFirstDownload)
+                    selectAsChatModelIfNoneSelected(fileName)
                     refreshFromDisk()
                 }
                 is ModelInstall.Progress.Failed -> {
@@ -517,6 +519,22 @@ class SettingLocalLlmViewModel(
                     _errorMessage.value = p.cause.message.orEmpty()
                 }
             }
+        }
+    }
+
+    /**
+     * Makes a just-installed model the global chat model when the user has no usable chat
+     * model yet (fresh install, or the previous one was deleted), so an imported local
+     * model can drive the agent right away. An existing valid selection is left untouched.
+     */
+    private suspend fun selectAsChatModelIfNoneSelected(fileName: String) {
+        val targetId = providerIdForRuntime()
+        settingsStore.update { old ->
+            if (old.getCurrentChatModel() != null) return@update old
+            val installed = old.providers.firstOrNull { it.id == targetId }
+                ?.models?.firstOrNull { it.modelId == fileName }
+                ?: return@update old
+            old.copy(chatModelId = installed.id)
         }
     }
 
