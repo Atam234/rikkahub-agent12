@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(llamajni CXX)
 
+# Always compile the inference engine optimized. A debug APK otherwise builds llama.cpp
+# at -O0, which makes on-device generation tens of times slower - slow enough that a
+# reply looks like it never arrives.
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
