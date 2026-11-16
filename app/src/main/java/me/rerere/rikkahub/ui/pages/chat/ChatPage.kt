@@ -83,6 +83,7 @@ import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.service.HezamVoiceService
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
@@ -308,57 +309,25 @@ private fun ChatPageContent(
     val assistant = setting.getCurrentAssistant()
     var showFilesSheet by remember { mutableStateOf(false) }
 
-    // Hands-free "Hezam" voice control: wake word in, spoken reply out.
-    val voiceUnavailableText = stringResource(R.string.hezam_voice_unavailable)
+    // Hands-free "Hezam" voice control runs in HezamVoiceService so it keeps listening
+    // outside the app; this screen only toggles it and tells it which chat is open.
     val voiceMicDeniedText = stringResource(R.string.hezam_voice_mic_denied)
-    val selectModelFirstText = stringResource(R.string.chat_select_model_first)
-    val latestChatModel by rememberUpdatedState(currentChatModel)
-    val latestConversation by rememberUpdatedState(conversation)
-    val voiceController = remember(context) {
-        HezamVoiceController(context.applicationContext) { command ->
-            if (latestChatModel == null) {
-                toaster.show(selectModelFirstText, type = ToastType.Error)
-            } else {
-                vm.handleMessageSend(listOf(UIMessagePart.Text(command)))
+    val voicePhase = HezamVoiceService.controller?.phase ?: HezamVoicePhase.Off
+    DisposableEffect(conversation.id) {
+        HezamVoiceService.activeConversationId = conversation.id
+        onDispose {
+            if (HezamVoiceService.activeConversationId == conversation.id) {
+                HezamVoiceService.activeConversationId = null
             }
-        }
-    }
-    DisposableEffect(voiceController) {
-        onDispose { voiceController.release() }
-    }
-    val startVoice = {
-        voiceController.start()
-        if (voiceController.phase == HezamVoicePhase.Unavailable) {
-            toaster.show(voiceUnavailableText, type = ToastType.Error)
         }
     }
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) startVoice() else toaster.show(voiceMicDeniedText, type = ToastType.Error)
-    }
-    val voiceLoading = loadingJob != null
-    var voiceSawLoading by remember { mutableStateOf(false) }
-    LaunchedEffect(voiceController.phase, voiceLoading) {
-        if (voiceController.phase != HezamVoicePhase.Working) {
-            voiceSawLoading = false
-            return@LaunchedEffect
-        }
-        if (voiceLoading) {
-            voiceSawLoading = true
-        } else if (voiceSawLoading) {
-            voiceSawLoading = false
-            // Give the final streamed text a moment to land in the conversation.
-            delay(400.milliseconds)
-            val reply = latestConversation.currentMessages
-                .lastOrNull { it.role == MessageRole.ASSISTANT }
-                ?.toText()
-                .orEmpty()
-            voiceController.onReply(reply)
+        if (granted) {
+            HezamVoiceService.start(context)
         } else {
-            // The command never started a reply (no model, send refused): listen again.
-            delay(8000.milliseconds)
-            voiceController.resumeListening()
+            toaster.show(voiceMicDeniedText, type = ToastType.Error)
         }
     }
     val attachmentPickerActions = rememberChatAttachmentPickerActions(
@@ -402,15 +371,15 @@ private fun ChatPageContent(
                     onOpenSettings = {
                         navController.navigate(Screen.Setting)
                     },
-                    voicePhase = voiceController.phase,
+                    voicePhase = voicePhase,
                     onToggleVoice = {
-                        if (voiceController.phase != HezamVoicePhase.Off) {
-                            voiceController.stop()
+                        if (HezamVoiceService.controller != null) {
+                            HezamVoiceService.stop(context)
                         } else if (
                             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                             PackageManager.PERMISSION_GRANTED
                         ) {
-                            startVoice()
+                            HezamVoiceService.start(context)
                         } else {
                             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
