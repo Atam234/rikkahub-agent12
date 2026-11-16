@@ -47,6 +47,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import me.rerere.hugeicons.stroke.Settings03
 import me.rerere.hugeicons.stroke.Add01
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.core.content.ContextCompat
+import me.rerere.ai.core.MessageRole
+import me.rerere.hugeicons.stroke.Mic01
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -298,6 +307,60 @@ private fun ChatPageContent(
     val hazeState = rememberHazeState()
     val assistant = setting.getCurrentAssistant()
     var showFilesSheet by remember { mutableStateOf(false) }
+
+    // Hands-free "Hezam" voice control: wake word in, spoken reply out.
+    val voiceUnavailableText = stringResource(R.string.hezam_voice_unavailable)
+    val voiceMicDeniedText = stringResource(R.string.hezam_voice_mic_denied)
+    val selectModelFirstText = stringResource(R.string.chat_select_model_first)
+    val latestChatModel by rememberUpdatedState(currentChatModel)
+    val latestConversation by rememberUpdatedState(conversation)
+    val voiceController = remember(context) {
+        HezamVoiceController(context.applicationContext) { command ->
+            if (latestChatModel == null) {
+                toaster.show(selectModelFirstText, type = ToastType.Error)
+            } else {
+                vm.handleMessageSend(listOf(UIMessagePart.Text(command)))
+            }
+        }
+    }
+    DisposableEffect(voiceController) {
+        onDispose { voiceController.release() }
+    }
+    val startVoice = {
+        voiceController.start()
+        if (voiceController.phase == HezamVoicePhase.Unavailable) {
+            toaster.show(voiceUnavailableText, type = ToastType.Error)
+        }
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) startVoice() else toaster.show(voiceMicDeniedText, type = ToastType.Error)
+    }
+    val voiceLoading = loadingJob != null
+    var voiceSawLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(voiceController.phase, voiceLoading) {
+        if (voiceController.phase != HezamVoicePhase.Working) {
+            voiceSawLoading = false
+            return@LaunchedEffect
+        }
+        if (voiceLoading) {
+            voiceSawLoading = true
+        } else if (voiceSawLoading) {
+            voiceSawLoading = false
+            // Give the final streamed text a moment to land in the conversation.
+            delay(400.milliseconds)
+            val reply = latestConversation.currentMessages
+                .lastOrNull { it.role == MessageRole.ASSISTANT }
+                ?.toText()
+                .orEmpty()
+            voiceController.onReply(reply)
+        } else {
+            // The command never started a reply (no model, send refused): listen again.
+            delay(8000.milliseconds)
+            voiceController.resumeListening()
+        }
+    }
     val attachmentPickerActions = rememberChatAttachmentPickerActions(
         inputState = inputState,
         setting = setting,
@@ -338,6 +401,19 @@ private fun ChatPageContent(
                     },
                     onOpenSettings = {
                         navController.navigate(Screen.Setting)
+                    },
+                    voicePhase = voiceController.phase,
+                    onToggleVoice = {
+                        if (voiceController.phase != HezamVoicePhase.Off) {
+                            voiceController.stop()
+                        } else if (
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            startVoice()
+                        } else {
+                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
                     },
                     onClickMenu = {
                         previewMode = !previewMode
@@ -647,6 +723,8 @@ private fun TopBar(
     onClickMenu: () -> Unit,
     onNewChat: () -> Unit,
     onOpenSettings: () -> Unit,
+    voicePhase: HezamVoicePhase,
+    onToggleVoice: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
@@ -690,7 +768,25 @@ private fun TopBar(
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (model != null && provider != null) {
+                    val voiceStatus = when (voicePhase) {
+                        HezamVoicePhase.Off -> null
+                        HezamVoicePhase.Listening -> stringResource(R.string.hezam_voice_listening)
+                        HezamVoicePhase.AwaitingCommand -> stringResource(R.string.hezam_voice_awaiting)
+                        HezamVoicePhase.Working -> stringResource(R.string.hezam_voice_working)
+                        HezamVoicePhase.Speaking -> stringResource(R.string.hezam_voice_speaking)
+                        HezamVoicePhase.Unavailable -> stringResource(R.string.hezam_voice_unavailable)
+                    }
+                    if (voiceStatus != null) {
+                        Text(
+                            text = voiceStatus,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                            )
+                        )
+                    } else if (model != null && provider != null) {
                         Text(
                             text = "${assistant.name.ifBlank { stringResource(R.string.assistant_page_default_assistant) }} / ${model.displayName} (${provider.name})",
                             overflow = TextOverflow.Ellipsis,
@@ -705,20 +801,28 @@ private fun TopBar(
             }
         },
         actions = {
+            GlossyCircleButton(
+                onClick = onToggleVoice,
+                active = voicePhase != HezamVoicePhase.Off && voicePhase != HezamVoicePhase.Unavailable,
+                modifier = Modifier.padding(end = 6.dp),
+            ) {
+                Icon(HugeIcons.Mic01, stringResource(R.string.hezam_voice_toggle))
+            }
+
             GlossyCircleButton(onClick = onClickMenu) {
                 Icon(if (previewMode) HugeIcons.Cancel01 else HugeIcons.LeftToRightListBullet, stringResource(R.string.accessibility_chat_options))
             }
 
             GlossyCircleButton(
                 onClick = onOpenSettings,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier.padding(start = 6.dp),
             ) {
                 Icon(HugeIcons.Settings03, stringResource(R.string.settings))
             }
 
             GlossyCircleButton(
                 onClick = onNewChat,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                modifier = Modifier.padding(start = 6.dp, end = 8.dp),
             ) {
                 Icon(HugeIcons.Add01, stringResource(R.string.chat_page_new_message))
             }
@@ -730,20 +834,25 @@ private fun TopBar(
 private fun GlossyCircleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(42.dp)
+            .size(38.dp)
             .clip(CircleShape)
             .background(
                 Brush.verticalGradient(
                     listOf(colors.surfaceContainerHighest, colors.surfaceContainerLow)
                 )
             )
-            .border(1.dp, colors.onSurface.copy(alpha = 0.14f), CircleShape)
+            .border(
+                width = if (active) 2.dp else 1.dp,
+                color = if (active) colors.primary else colors.onSurface.copy(alpha = 0.14f),
+                shape = CircleShape,
+            )
             .clickable(onClick = onClick),
     ) {
         content()

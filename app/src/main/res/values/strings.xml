@@ -1746,6 +1746,13 @@
   <string name="local_llm_catalog_tag_tools">Tools</string>
   <string name="local_llm_llamacpp_catalog_title">Available models</string>
   <string name="local_llm_llamacpp_catalog_subtitle">Curated GGUF models with a tool-calling chat template. Pick one for one-tap install.</string>
+  <string name="hezam_voice_toggle">Hezam voice control</string>
+  <string name="hezam_voice_listening">Nakikinig… sabihin ang “Hezam”</string>
+  <string name="hezam_voice_awaiting">Ano ang utos mo?</string>
+  <string name="hezam_voice_working">Ginagawa ang utos…</string>
+  <string name="hezam_voice_speaking">Sumasagot…</string>
+  <string name="hezam_voice_unavailable">Walang speech recognition sa phone na ito</string>
+  <string name="hezam_voice_mic_denied">Kailangan ng pahintulot sa mikropono</string>
   <string name="local_model_import_action">Import local AI model from files</string>
   <string name="local_model_import_hint">Pick a .gguf (llama.cpp) or .litertlm (LiteRT) file from your storage. It is copied into the app and runs fully on-device.</string>
   <string name="local_model_import_copying">Copying model into the app…</string>
