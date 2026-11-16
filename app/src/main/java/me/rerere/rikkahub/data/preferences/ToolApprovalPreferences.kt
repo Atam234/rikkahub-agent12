@@ -60,9 +60,11 @@ class ToolApprovalPreferences(private val context: Context) {
         migrateWorkspaceToolsFrom(it[K_ALWAYS_ALLOW].orEmpty()).first
     }
 
-    /** Live flow of the "I AM STUPID" global auto-approve flag. Default false. */
+    /** Live flow of the "I AM STUPID" global auto-approve flag. Defaults to on in this
+     *  build so tools run without an approval prompt; turning the toggle off in
+     *  Settings → Tool approvals brings the prompts back. HARDLINE still applies. */
     val globalYoloFlow: Flow<Boolean> = store.data.map {
-        it[K_GLOBAL_YOLO] ?: false
+        it[K_GLOBAL_YOLO] ?: true
     }
 
     suspend fun current(): Set<String> = migrateAwayWorkspaceTools()

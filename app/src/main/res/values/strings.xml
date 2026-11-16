@@ -1756,6 +1756,7 @@
   <string name="hezam_voice_notification_title">Nakikinig si Hezam</string>
   <string name="hezam_voice_notification_text">Sabihin ang “Hezam” at ang utos mo</string>
   <string name="hezam_voice_notification_stop">Ihinto</string>
+  <string name="hezam_voice_need_accessibility">Buksan muna ang Accessibility para kay Hezam sa settings ng phone.</string>
   <string name="hezam_voice_mic_denied">Kailangan ng pahintulot sa mikropono</string>
   <string name="local_model_import_action">Import local AI model from files</string>
   <string name="local_model_import_hint">Pick a .gguf (llama.cpp) or .litertlm (LiteRT) file from your storage. It is copied into the app and runs fully on-device.</string>

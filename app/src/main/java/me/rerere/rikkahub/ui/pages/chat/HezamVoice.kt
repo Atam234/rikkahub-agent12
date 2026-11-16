@@ -41,6 +41,9 @@ enum class HezamVoicePhase {
 class HezamVoiceController(
     private val context: Context,
     private val onCommand: (String) -> Unit,
+    /** Offered every command first; returns true when it was handled on the spot (stop,
+     *  play, scroll) and must not be sent to the assistant. */
+    private val onQuickCommand: (String) -> Boolean = { false },
 ) {
     var phase by mutableStateOf(HezamVoicePhase.Off)
         private set
@@ -95,20 +98,35 @@ class HezamVoiceController(
         if (!enabled) return
         val text = cleanForSpeech(reply)
         if (text.isBlank()) {
-            listen()
+            backToListening()
         } else {
             speak(text)
         }
     }
 
-    /** The command produced no reply (for example no model is selected): go back to listening. */
+    /** The command is over without a reply to read (stopped, or nothing came back). */
     fun resumeListening() {
-        if (enabled && phase == HezamVoicePhase.Working) listen()
+        if (enabled && phase == HezamVoicePhase.Working) backToListening()
+    }
+
+    /** Says [text] aloud, then goes back to listening. */
+    fun announce(text: String) {
+        if (enabled) speak(text)
+    }
+
+    private fun backToListening() {
+        awaitingCommand = false
+        phase = HezamVoicePhase.Listening
+        scheduleListen(RESTART_DELAY_MS)
     }
 
     private fun listen() {
         if (!enabled) return
-        phase = if (awaitingCommand) HezamVoicePhase.AwaitingCommand else HezamVoicePhase.Listening
+        // While a command is being worked on the mic stays open, but only so "Hezam, stop"
+        // can interrupt it - the phase keeps saying Working.
+        if (phase != HezamVoicePhase.Working) {
+            phase = if (awaitingCommand) HezamVoicePhase.AwaitingCommand else HezamVoicePhase.Listening
+        }
         val current = recognizer ?: SpeechRecognizer.createSpeechRecognizer(context).also {
             it.setRecognitionListener(listener)
             recognizer = it
@@ -132,6 +150,13 @@ class HezamVoiceController(
         if (!enabled) return
         val first = candidates.firstOrNull().orEmpty().trim()
         if (first.isNotEmpty()) lastHeard = first
+
+        if (phase == HezamVoicePhase.Working) {
+            val quick = candidates.firstNotNullOfOrNull { extractCommand(it) }
+            if (!quick.isNullOrBlank()) onQuickCommand(quick)
+            if (enabled && phase != HezamVoicePhase.Speaking) scheduleListen(RESTART_DELAY_MS)
+            return
+        }
 
         if (awaitingCommand) {
             if (first.isEmpty()) {
@@ -160,8 +185,13 @@ class HezamVoiceController(
             scheduleListen(RESTART_DELAY_MS)
             return
         }
+        if (onQuickCommand(command)) {
+            if (enabled && phase != HezamVoicePhase.Speaking) backToListening()
+            return
+        }
         phase = HezamVoicePhase.Working
         onCommand(command)
+        scheduleListen(RESTART_DELAY_MS)
     }
 
     private fun ensureTts() {
@@ -250,7 +280,10 @@ class HezamVoiceController(
         override fun onError(error: Int) {
             if (!enabled) return
             // Only keep looping while we are actually waiting on the microphone.
-            if (phase != HezamVoicePhase.Listening && phase != HezamVoicePhase.AwaitingCommand) return
+            if (phase != HezamVoicePhase.Listening &&
+                phase != HezamVoicePhase.AwaitingCommand &&
+                phase != HezamVoicePhase.Working
+            ) return
             when (error) {
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                     enabled = false
