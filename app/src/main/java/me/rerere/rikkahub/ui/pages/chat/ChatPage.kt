@@ -82,6 +82,7 @@ import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.ai.CommandShortcuts
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.service.HezamVoiceService
 import me.rerere.rikkahub.data.datastore.Settings
@@ -454,7 +455,15 @@ private fun ChatPageContent(
                                 messageId = inputState.editingMessage!!,
                             )
                         } else {
-                            vm.handleMessageSend(inputState.getContents())
+                            vm.handleMessageSend(
+                                inputState.getContents().map { part ->
+                                    if (part is UIMessagePart.Text) {
+                                        part.copy(text = CommandShortcuts.expand(part.text))
+                                    } else {
+                                        part
+                                    }
+                                }
+                            )
                             scope.launch {
                                 delay(100.milliseconds)
                                 chatListState.requestScrollToItem(conversation.currentMessages.size + 5)

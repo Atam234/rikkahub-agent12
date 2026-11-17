@@ -37,6 +37,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.ai.CommandShortcuts
 import me.rerere.rikkahub.RouteActivity
 import me.rerere.rikkahub.ui.pages.chat.HezamVoiceController
 import me.rerere.rikkahub.ui.pages.chat.HezamVoicePhase
@@ -173,7 +174,7 @@ class HezamVoiceService : Service() {
             val reply = try {
                 val conversationId = activeConversationId ?: ownConversation()
                 lastCommandConversationId = conversationId
-                val pendingReply = chatService.enqueueVoiceMessage(conversationId, command)
+                val pendingReply = chatService.enqueueVoiceMessage(conversationId, CommandShortcuts.expand(command))
                 awaitReplyOrApproval(conversationId, pendingReply)
             } catch (cancel: CancellationException) {
                 throw cancel
