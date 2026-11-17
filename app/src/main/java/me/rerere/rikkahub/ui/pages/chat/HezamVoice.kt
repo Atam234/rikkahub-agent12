@@ -32,7 +32,7 @@ enum class HezamVoicePhase {
 
 /**
  * Hands-free voice control: listens through the phone's own speech recognition service in
- * Filipino, waits for the wake word "Hezam", hands the spoken command to [onCommand], and
+ * Filipino, waits for the wake word "Agent47", hands the spoken command to [onCommand], and
  * reads the assistant's reply aloud with the system text-to-speech voice.
  *
  * Only runs while the chat screen that owns it is on screen; it is not a background service.
@@ -310,10 +310,16 @@ class HezamVoiceController(
 
         // Speech recognition rarely spells the name the same way twice, so accept the
         // spellings it tends to produce for "Hezam".
+        // Wake word "Agent47". Recognizers write the number as digits or as words, in
+        // English or Filipino, and often mishear "agent" - accept the common forms.
         private val WAKE_WORD = Regex(
             "\\b(?:hey\\s+|hi\\s+|ok\\s+|okay\\s+)?" +
-                "(?:hezam|hesam|hisam|hizam|hezan|hesham|hisham|hazam|hasam|hassam|" +
-                "he\\s?sam|hey\\s?sam|he\\s?zam|esam|isam|ezam)\\b[\\s,.!?:;]*",
+                "(?:agent|ejent|eydyent|aydyent|age\\s?nt|asian|aging|agents)" +
+                "[\\s-]*" +
+                "(?:47|4\\s?7|forty[\\s-]?seven|fourty[\\s-]?seven|for\\s?tea[\\s-]?seven|" +
+                "apatnapu'?t?\\s*pito|apat\\s+na\\s+pu'?t?\\s*pito|kwarenta['\\s-]*y?\\s*siyete|" +
+                "kuwarenta['\\s-]*y?\\s*siyete|kwarenta['\\s-]*y?\\s*syete)" +
+                "\\b[\\s,.!?:;]*",
             RegexOption.IGNORE_CASE,
         )
 
