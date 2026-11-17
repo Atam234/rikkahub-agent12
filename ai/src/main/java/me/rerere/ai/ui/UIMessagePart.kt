@@ -221,9 +221,12 @@ sealed class UIMessagePart {
                 output.isEmpty() && executionStartedAt != null
 
         /** Parse input string as JsonElement */
+        // Always an object: a tool called with no arguments can arrive as "" or "null", and
+        // providers (Anthropic via Cloud Code Assist in particular) reject a tool_use whose
+        // input is missing or not an object.
         fun inputAsJson(): JsonElement = runCatching {
             json.parseToJsonElement(input.ifBlank { "{}" })
-        }.getOrElse { JsonObject(emptyMap()) }
+        }.getOrNull() as? JsonObject ?: JsonObject(emptyMap())
 
         fun merge(other: Tool): Tool {
             return Tool(

@@ -640,7 +640,7 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
                 UIMessagePart.Tool(
                     toolCallId = toolCallId,
                     toolName = functionCall["name"]!!.jsonPrimitive.content,
-                    input = json.encodeToString(functionCall["args"]),
+                    input = (functionCall["args"] as? JsonObject)?.let(json::encodeToString) ?: "{}",
                     output = emptyList(),
                     metadata = GoogleThoughtMetadata(
                         thoughtSignature = jsonObject["thoughtSignature"]?.jsonPrimitive?.contentOrNull,
