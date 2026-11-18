@@ -60,6 +60,9 @@ class RikkaAccessibilityService : AccessibilityService() {
         instance = this
         _running.value = true
         Log.i(TAG, "AccessibilityService connected")
+        // The system binds this service at boot and after a kill, so it is where Agent47
+        // comes back on its own if the user left voice control on.
+        HezamVoiceService.restoreIfWanted(applicationContext)
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {

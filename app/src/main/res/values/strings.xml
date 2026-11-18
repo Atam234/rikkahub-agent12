@@ -1757,6 +1757,9 @@
   <string name="hezam_voice_notification_text">Sabihin ang “Agent47” at ang utos mo</string>
   <string name="hezam_voice_notification_stop">Ihinto</string>
   <string name="hezam_voice_need_accessibility">Buksan muna ang Accessibility para kay Agent47 sa settings ng phone.</string>
+  <string name="hezam_voice_resume_channel">Agent47 restart</string>
+  <string name="hezam_voice_resume_title">Naka-pause si Agent47</string>
+  <string name="hezam_voice_resume_text">I-tap para makinig ulit si Agent47</string>
   <string name="hezam_voice_mic_denied">Kailangan ng pahintulot sa mikropono</string>
   <string name="local_model_import_action">Import local AI model from files</string>
   <string name="local_model_import_hint">Pick a .gguf (llama.cpp) or .litertlm (LiteRT) file from your storage. It is copied into the app and runs fully on-device.</string>

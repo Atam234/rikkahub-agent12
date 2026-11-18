@@ -915,6 +915,9 @@ class LocalTools(
             tools.add(fileInfoTool())
             tools.add(findFilesTool())
             tools.add(showImageTool(context, invocationContext.modelCanSeeImages))  // inline image display; no separate auto-stream needed
+            tools.add(me.rerere.rikkahub.data.ai.tools.local.rememberPersonTool(context))
+            tools.add(me.rerere.rikkahub.data.ai.tools.local.findPersonPhotosTool(context))
+            tools.add(me.rerere.rikkahub.data.ai.tools.local.forgetPersonTool(context))
             tools.add(openFileTool(context, invocationContext, interactiveToolStreamer))
             // Batch ops (item 5.5) — list-or-glob copy / move / delete. Same toggle group
             // as the single-path file tools; every path still goes through PathSafetyGuard.

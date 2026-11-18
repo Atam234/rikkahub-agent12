@@ -327,6 +327,7 @@ private fun ChatPageContent(
     ) { granted ->
         if (granted) {
             HezamVoiceService.start(context)
+            requestUnrestrictedBattery(context)
         } else {
             toaster.show(voiceMicDeniedText, type = ToastType.Error)
         }
@@ -381,6 +382,7 @@ private fun ChatPageContent(
                             PackageManager.PERMISSION_GRANTED
                         ) {
                             HezamVoiceService.start(context)
+                            requestUnrestrictedBattery(context)
                         } else {
                             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
@@ -834,5 +836,19 @@ private fun GlossyCircleButton(
             .clickable(onClick = onClick),
     ) {
         content()
+    }
+}
+
+/** Asks the system to stop battery-optimizing the app, so Agent47 keeps listening. */
+private fun requestUnrestrictedBattery(context: android.content.Context) {
+    val power = context.getSystemService(android.os.PowerManager::class.java) ?: return
+    if (power.isIgnoringBatteryOptimizations(context.packageName)) return
+    runCatching {
+        context.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                android.net.Uri.parse("package:${context.packageName}"),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 }

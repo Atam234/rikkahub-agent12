@@ -71,13 +71,18 @@ class HezamVoiceService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            setWanted(this, false)
             stopSelf()
             return START_NOT_STICKY
         }
         if (!promoteToForeground()) {
+            // Android refused a microphone service from the background (after a reboot or
+            // after the system killed us): ask the user for one tap to bring Agent47 back.
+            postResumeNotification(this)
             stopSelf()
             return START_NOT_STICKY
         }
+        cancelResumeNotification(this)
         if (voice == null) {
             val created = HezamVoiceController(
                 context = this,
@@ -308,14 +313,76 @@ class HezamVoiceService : Service() {
         @Volatile
         var activeConversationId: Uuid? = null
 
+        private const val PREFS = "agent47_voice"
+        private const val KEY_WANTED = "wanted"
+        private const val RESUME_CHANNEL_ID = "agent47_resume"
+        private const val RESUME_NOTIFICATION_ID = 0x4846
+
         fun start(context: Context) {
+            setWanted(context, true)
             ContextCompat.startForegroundService(
                 context, Intent(context, HezamVoiceService::class.java),
             )
         }
 
         fun stop(context: Context) {
+            setWanted(context, false)
+            cancelResumeNotification(context)
             context.stopService(Intent(context, HezamVoiceService::class.java))
+        }
+
+        private fun setWanted(context: Context, wanted: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_WANTED, wanted).apply()
+        }
+
+        private fun isWanted(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WANTED, false)
+
+        /**
+         * Brings Agent47 back after a reboot or after the system killed it, if the user left it
+         * on. Android may refuse to start a microphone service from the background; then a
+         * notification asks for one tap, which is allowed to start it.
+         */
+        fun restoreIfWanted(context: Context) {
+            if (!isWanted(context) || controller != null) return
+            try {
+                ContextCompat.startForegroundService(
+                    context, Intent(context, HezamVoiceService::class.java),
+                )
+            } catch (t: Throwable) {
+                Log.w(TAG, "Background restart refused; asking the user to tap", t)
+                postResumeNotification(context)
+            }
+        }
+
+        private fun postResumeNotification(context: Context) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(RESUME_CHANNEL_ID) == null) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        RESUME_CHANNEL_ID,
+                        context.getString(R.string.hezam_voice_resume_channel),
+                        NotificationManager.IMPORTANCE_DEFAULT,
+                    )
+                )
+            }
+            val resume = PendingIntent.getForegroundService(
+                context, 2, Intent(context, HezamVoiceService::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val notification = NotificationCompat.Builder(context, RESUME_CHANNEL_ID)
+                .setContentTitle(context.getString(R.string.hezam_voice_resume_title))
+                .setContentText(context.getString(R.string.hezam_voice_resume_text))
+                .setSmallIcon(R.drawable.small_icon)
+                .setContentIntent(resume)
+                .setAutoCancel(true)
+                .build()
+            runCatching { manager.notify(RESUME_NOTIFICATION_ID, notification) }
+        }
+
+        private fun cancelResumeNotification(context: Context) {
+            context.getSystemService(NotificationManager::class.java).cancel(RESUME_NOTIFICATION_ID)
         }
     }
 }

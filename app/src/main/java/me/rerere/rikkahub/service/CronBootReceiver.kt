@@ -34,6 +34,10 @@ class CronBootReceiver : BroadcastReceiver(), KoinComponent {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            // Bring Agent47 voice control back if the user left it on.
+            HezamVoiceService.restoreIfWanted(context.applicationContext)
+        }
         if (action != Intent.ACTION_BOOT_COMPLETED &&
             action != Intent.ACTION_MY_PACKAGE_REPLACED &&
             action != "android.intent.action.QUICKBOOT_POWERON") return
