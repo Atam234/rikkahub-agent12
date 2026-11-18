@@ -35,9 +35,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.toList
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.CommandShortcuts
+import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.getSelectedTTSProvider
+import me.rerere.tts.controller.AudioPlayer
+import me.rerere.tts.model.TTSRequest
+import me.rerere.tts.model.TTSResponse
+import me.rerere.tts.provider.TTSManager
+import me.rerere.tts.provider.TTSProviderSetting
+import java.io.ByteArrayOutputStream
 import me.rerere.rikkahub.RouteActivity
 import me.rerere.rikkahub.ui.pages.chat.HezamVoiceController
 import me.rerere.rikkahub.ui.pages.chat.HezamVoicePhase
@@ -56,6 +66,9 @@ import kotlin.uuid.Uuid
  */
 class HezamVoiceService : Service() {
     private val chatService: ChatService by inject()
+    private val settingsStore: SettingsStore by inject()
+    private val ttsManager: TTSManager by inject()
+    private var audioPlayer: AudioPlayer? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var voice: HezamVoiceController? = null
@@ -88,6 +101,7 @@ class HezamVoiceService : Service() {
                 context = this,
                 onCommand = { command -> handleCommand(command) },
                 onQuickCommand = { command -> handleQuickCommand(command) },
+                customSpeaker = { text -> speakWithChosenVoice(text) },
             )
             voice = created
             controller = created
@@ -102,7 +116,32 @@ class HezamVoiceService : Service() {
         return START_STICKY
     }
 
+    /**
+     * Speaks [text] with the voice selected in Settings → Speech (for example the user's own
+     * cloned voice on ElevenLabs or Fish Audio). Returns false when the phone's built-in
+     * voice is selected or synthesis fails, so the controller falls back to it.
+     */
+    private suspend fun speakWithChosenVoice(text: String): Boolean {
+        val provider = settingsStore.settingsFlowRaw.first().getSelectedTTSProvider() ?: return false
+        if (provider is TTSProviderSetting.SystemTTS) return false
+        val chunks = withContext(Dispatchers.IO) {
+            ttsManager.generateSpeech(provider, TTSRequest(text)).toList()
+        }
+        if (chunks.isEmpty()) return false
+        val bytes = ByteArrayOutputStream().apply { chunks.forEach { write(it.data) } }.toByteArray()
+        if (bytes.isEmpty()) return false
+        val player = audioPlayer ?: AudioPlayer(this).also { audioPlayer = it }
+        try {
+            player.play(TTSResponse(bytes, chunks.first().format, chunks.first().sampleRate))
+        } finally {
+            runCatching { player.stop() }
+        }
+        return true
+    }
+
     override fun onDestroy() {
+        runCatching { audioPlayer?.release() }
+        audioPlayer = null
         controller = null
         voice?.release()
         voice = null
@@ -136,6 +175,7 @@ class HezamVoiceService : Service() {
     /** Pauses whatever is playing and cancels the command the assistant is working on. */
     private fun stopEverything() {
         sendMediaKey(KeyEvent.KEYCODE_MEDIA_PAUSE)
+        runCatching { audioPlayer?.stop() }
         commandJob?.cancel()
         commandJob = null
         val conversationId = lastCommandConversationId

@@ -13,6 +13,13 @@ import android.speech.tts.UtteranceProgressListener
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 /** What the hands-free voice loop is doing right now, for the status line in the top bar. */
@@ -44,7 +51,14 @@ class HezamVoiceController(
     /** Offered every command first; returns true when it was handled on the spot (stop,
      *  play, scroll) and must not be sent to the assistant. */
     private val onQuickCommand: (String) -> Boolean = { false },
+    /** Speaks with the voice chosen in the app's speech settings (for example a cloned
+     *  voice). Returns false when there is none or it failed, to fall back to the phone's
+     *  own text-to-speech voice. */
+    private val customSpeaker: (suspend (String) -> Boolean)? = null,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var speakJob: Job? = null
+
     var phase by mutableStateOf(HezamVoicePhase.Off)
         private set
 
@@ -81,11 +95,14 @@ class HezamVoiceController(
         handler.removeCallbacksAndMessages(null)
         runCatching { recognizer?.cancel() }
         runCatching { tts?.stop() }
+        speakJob?.cancel()
+        speakJob = null
         phase = HezamVoicePhase.Off
     }
 
     fun release() {
         stop()
+        scope.cancel()
         runCatching { recognizer?.destroy() }
         recognizer = null
         runCatching { tts?.shutdown() }
@@ -240,6 +257,26 @@ class HezamVoiceController(
         runCatching { recognizer?.cancel() }
         handler.removeCallbacksAndMessages(null)
         phase = HezamVoicePhase.Speaking
+        val custom = customSpeaker
+        if (custom != null) {
+            speakJob?.cancel()
+            speakJob = scope.launch {
+                val spoken = try {
+                    custom(text)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Throwable) {
+                    false
+                }
+                if (spoken) onSpeechFinished() else speakWithPhoneVoice(text)
+            }
+            return
+        }
+        speakWithPhoneVoice(text)
+    }
+
+    private fun speakWithPhoneVoice(text: String) {
+        if (!enabled) return
         val engine = tts
         if (engine == null) {
             pendingSpeech = text
