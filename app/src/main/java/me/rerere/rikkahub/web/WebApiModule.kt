@@ -20,6 +20,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import me.rerere.rikkahub.web.lan.lanChatPage
+import me.rerere.rikkahub.web.lan.lanChatRoutes
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.repository.ConversationRepository
@@ -64,7 +66,8 @@ fun Application.configureWebApi(
     conversationRepo: ConversationRepository,
     folderRepo: FolderRepository,
     settingsStore: SettingsStore,
-    filesManager: FilesManager
+    filesManager: FilesManager,
+    port: Int = 8080,
 ) {
     val jwtEnabled = settingsStore.settingsFlow.value.webServerJwtEnabled
 
@@ -138,7 +141,11 @@ fun Application.configureWebApi(
     }
 
     routing {
+        // LAN chat is for guests on the same Wi-Fi, so it stays outside the access password.
+        lanChatPage()
         route("/api") {
+            lanChatRoutes(port)
+
             post("/auth/token") {
                 val settings = settingsStore.settingsFlow.value
                 if (!settings.webServerJwtEnabled) {

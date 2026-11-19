@@ -1227,13 +1227,12 @@ export const ConversationSidebar = React.memo(
             </DropdownMenu>
 
             <a
-              href="https://rikka-ai.com"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/lan"
               className="ml-auto text-xs font-normal text-foreground/80 hover:text-foreground transition-colors"
             >
-              RikkaHub
+              LAN Chat
             </a>
+            <span className="text-xs font-normal text-foreground/80">Umpat Technology</span>
           </div>
         </SidebarFooter>
       </Sidebar>
